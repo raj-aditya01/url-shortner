@@ -668,6 +668,40 @@ class SQLiteUrlRepository:
                 )
                 """
             )
+            
+            # ================================================================
+            # INITIALIZE AUTO-INCREMENT TO START AT 1,000,000
+            # ================================================================
+            # This ensures IDs start at 1,000,000 instead of 1
+            # Why 1,000,000?
+            # - Base62 encoding of small numbers (1-9) looks boring: "1", "2", "3"
+            # - Base62 encoding of 1,000,000+ looks better: "4c92", "4c93", "4c94"
+            # - Makes short URLs look more professional and random
+            #
+            # HOW IT WORKS:
+            # SQLite's AUTOINCREMENT uses a special table called sqlite_sequence
+            # We check if any URLs exist, and if not, we initialize the sequence
+            # This only runs once when the table is first created
+            #
+            # Check if table is empty (no URLs inserted yet)
+            cursor = self._conn.execute("SELECT COUNT(*) FROM url_mappings")
+            count = cursor.fetchone()[0]
+            
+            # If table is empty, initialize the auto-increment sequence
+            # This sets the next ID to be 1,000,000
+            if count == 0:
+                # Insert into sqlite_sequence to set the starting value
+                # This table tracks the last ID used for AUTOINCREMENT columns
+                # We set it to 999,999 so the next INSERT gets 1,000,000
+                self._conn.execute(
+                    """
+                    INSERT OR REPLACE INTO sqlite_sequence (name, seq) 
+                    VALUES ('url_mappings', 999999)
+                    """
+                )
+                # Note: This only affects NEW databases
+                # Existing databases keep their current sequence
+                # To reset an existing database, delete data/url_shortener.db
 
     # ========================================================================
     # METHOD: save_and_get_id
